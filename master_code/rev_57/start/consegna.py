@@ -1,0 +1,117 @@
+#!/usr/bin/env/ python
+# -*- coding: utf8 -*- 
+
+# 0 - import os
+#     os.system('echo "0 5\n5 1\n12 1\n17 5\n22 5\n22 10\n29 10\n29 5\n34 5\n" > punti.dat')
+
+# 1 - Leggere la serie di punti dal file appena creato con numpy
+
+from __future__ import division # no more zero integer divisions
+import os
+import sys
+import numpy as np
+import matplotlib.pyplot as plt
+
+print "Writing points..."
+
+#os.system('echo "0 5\n5 0\n12 0\n17 5\n22 5\n23 7\n27 7\n28 5\n34 5\n" > punti.dat')
+os.system('echo "0 5\n5 0\n20 0\n25 5\n40 5\n41 7\n44 7\n45 5\n50 5\n" > punti.dat')
+
+print "Reading points from file..."
+points_a = np.genfromtxt("punti.dat")
+print "Read \n", points_a
+
+# 2 - Passare da array a lista
+
+print "Converting point array to list..."
+points_l = []
+for i in points_a:
+	points_l.append([i[0], i[1]])
+
+print "Points list \n", points_l
+	
+
+# 3 - Creare una funzione che interpola i punti in modo che tra due punti ce ne siano altri n
+# inserendo i punti in mezzo con la sintassi delle liste; interpolare aggiungendo 3 punti
+# ad ogni intervallo
+
+def get_y(p1, p2, x):
+	"""This function return the y value given a x value and two points
+	to compute a straight line
+	"""
+	m = (p2[1]-p1[1])/(p2[0]-p1[0])
+	q = -m*p2[0] + p2[1]
+	y = m*x + q
+	return y
+	
+def interp(l, n):
+	"""Interpolate two points in a straight line inserting n new points
+	"""
+	temp = l
+	for i in range(len(temp)-1):
+		p1 = temp[i]
+		p2 = temp[i+1]
+		x = np.linspace(p1[0],p2[0], n+2)[1:-1]
+		nl = []
+		for j in range(len(x)):
+			new_y = get_y(p1, p2, x[j])
+			nl.append([x[j], new_y])
+			#print "new sub list ", nl
+		l = l[:i+i*n+1]+nl+l[i+i*n+1:]
+	return l
+	
+new_points_l = interp(points_l, 3)
+		
+print "New points list \n", new_points_l
+
+# 5 - Riconvertire da liste a vettore
+
+new_points_a = np.array(new_points_l)
+
+print "Interpolated list size ", new_points_a.shape[0] 
+
+# 6 - Trovare il minimo e il massimo dei punti in x e y con numpy e a mano con 
+# dei cicli (creando una funzione apposta) e confrontare il risultato
+
+numpy_min_x = new_points_a[:,0].min()
+numpy_min_y = new_points_a[:,1].min()
+numpy_max_x = new_points_a[:,0].max()
+numpy_max_y = new_points_a[:,1].max()
+
+def find_min_max(l):
+	l_min = 0
+	l_max = 0
+	for i in l:
+		if i < l_min: l_min = i
+		if i > l_max: l_max = i
+	return l_min, l_max
+	
+hm_min_x, hm_max_x = find_min_max(new_points_a[:,0])
+hm_min_y, hm_max_y = find_min_max(new_points_a[:,1])
+
+print "numpy values ", numpy_min_x, numpy_max_x, numpy_min_y, numpy_max_y
+print "handmade values ", hm_min_x, hm_max_x, hm_min_y, hm_max_y
+
+# 7 - simmetrizzare le x dei punti rispetto a quello di indice 3 (= il quarto),
+# equivalente a tracciare la retta x = coord_x[3] e riflettere tutti i punti
+# con ascissa maggiore rispetto a tale retta
+
+pivot_idx = int(new_points_a.shape[0]/2-4)
+pivot = new_points_a[pivot_idx][0]
+
+for i in range(new_points_a.shape[0]):	
+	if new_points_a[i][0] > pivot:
+		new_points_a[i][0] = pivot - (new_points_a[i][0] - pivot)		
+		
+# 7 - fare il plot dei punti e unirli con segmenti di colore nero e della retta passante per 
+# [0, 3] [35, 3] di colore blu e salvarlo con 
+# plt.savefig("plot.png")
+
+plt.plot(new_points_a[:,0], new_points_a[:,1], linestyle = "-", marker = ".", markersize = 2, color = "black")
+plt.plot([0, 35], [3, 3], linestyle = "-", marker = "", color = "blue")
+
+plt.savefig("plot.png")
+
+# 8 - Calcolare con bisezione e newmann dove la funzione data interseca y = 3 per x < 7
+# e valutare chi ci mette meno con la funzione scritta prima
+

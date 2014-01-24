@@ -1,0 +1,33 @@
+# Strategy (bin lin/log, sqrt/no_sqrt, sort/no_sort)
+strategy = log_nosqrt_sort
+
+# File containing the positions of the particles
+file_1 = mill2sort-0-extracted.h5
+
+# File containing the positions of the fof centers
+file_2 = mill2_fof_snap67.h5
+
+# Path for data
+path = /home/ziosi/mill2_data/hdf5_sample/
+
+# Number of particles to be selected (0=all).
+n_sel = 0
+
+# Min r for the couples
+r_min = 0.001  # in Mpc/h
+
+# Max r for the couples
+r_max = 100  #in Mpc/h  
+
+# Number of shells+number of radii
+r_step = 40
+
+# Dimension of the leaves in the trees
+leafsize = 400
+
+# Log file
+
+log_file = serial.log
+
+# How many randoms respect to the data?
+m_factor = 1
