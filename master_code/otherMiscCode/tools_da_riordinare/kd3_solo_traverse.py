@@ -22,8 +22,9 @@ leaves = 0
 #                                                                                  #
 ####################################################################################
 
-# Deeply modified from the original by Anne Copyright Anne
-# M. Archibald 2008 Released under the scipy license
+# Modified from the original by Anne
+# Copyright Anne M. Archibald 2008
+# Released under the scipy license
 
 from heapq import heappush, heappop
 import scipy.sparse
@@ -46,7 +47,7 @@ def minkowski_distance_p(x,y,p=2):
         return np.sum(np.abs(y-x)**p,axis=-1)
 
 def minkowski_distance_p_f(x,y,p=2):
-    """Fortan function to calculate the distnces.
+    """Fortan function to calculate the distnces.. not working for now
     """
     result = f_dist.f_dist(x.shape[0], y.shape[0], x[:,0], x[:,1], x[:,2], y[:,0], y[:,1], y[:,2], np.empty((x.shape[0]*y.shape[0], 1))) 
     return result
@@ -102,15 +103,6 @@ class Rectangle(object):
     def max_distance_rectangle(self, other, strategy, p=2.):
         """Compute the maximum distance between points in the two hyperrectangles."""
         return minkowski_distance_p(0, np.maximum(self.maxes-other.mins,other.maxes-self.mins),p)
-
-    # Distances computed in fortran
-    def min_distance_rectangle_f(self, other, strategy, p=2.):
-        """Compute the minimum distance between points in the two hyperrectangles."""
-        return minkowski_distance_p_f(np.zeros(3)[np.newaxis,:], np.maximum(0,np.maximum(self.mins-other.maxes,other.mins-self.maxes))[np.newaxis,:],p)
-
-    def max_distance_rectangle_f(self, other, strategy, p=2.):
-        """Compute the maximum distance between points in the two hyperrectangles."""
-        return minkowski_distance_p_f(np.zeros(3)[np.newaxis,:], np.maximum(self.maxes-other.mins,other.maxes-self.mins)[np.newaxis,:],p)
 
 class KDTree(object):
     """kd-tree for quick nearest-neighbor lookup
@@ -232,7 +224,7 @@ class KDTree(object):
             # distance, so "d" is the dimension with the max range.
             d = np.argmax(maxes-mins)   
             maxval = maxes[d]   # coord of the max in the axis with max range
-            minval = mins[d]   # coord of the min  in the axis with min range
+            minval = mins[d]   # coord of the min  in the axis with max range
             if maxval==minval:
                 # all points are identical (zero dimension); warn user?
                 return KDTree.leafnode(idx)
@@ -241,7 +233,7 @@ class KDTree(object):
 
             # Sliding midpoint rule; see Maneewongvatana and Mount 1999
             # for arguments that this is a good idea.
-            split = (maxval+minval)*0.5  #/2   # coord where to split (=half of the range)
+            split = (maxval+minval)/2   # coord where to split (=half of the range)
 
             # Tuple containing the indexes of the non zero elements in
             # the 0-th dimension corresponding to the condition.
@@ -309,13 +301,14 @@ class KDTree(object):
         global dist_times
         dist_times = 0
 
+
         if self_corr:
             klogger.info("Self corr %s", self_corr)
             tot_traverse = self.tree.tag*(self.tree.tag-1)/2
         else:
             tot_traverse = self.tree.tag*other.tree.tag
 
-        klogger.info("Start counting: total number of nodes %s", tot_traverse)
+        klogger.info("Start counting: total traverse %s, ")
 
         def traverse(node1, rect1, node2, rect2, rad_idx):
             global n_traverse
@@ -325,16 +318,14 @@ class KDTree(object):
 
             n_traverse += 1
             if (n_traverse % 100000 == 0):
-                klogger.info("Traverse %s di %s with %s, %s", n_traverse, tot_traverse, node1.tag, node2.tag)
+                klogger.info("traverse %s of %s with %s, %s", n_traverse, tot_traverse, node1.tag, node2.tag)
+                
+            min_r = rect1.min_distance_rectangle(rect2, strategy, p)   # min dist between the two nodes
+            max_r = rect1.max_distance_rectangle(rect2, strategy, p)   # min dist between the two nodes
 
-#            min_r = rect1.min_distance_rectangle(rect2, strategy, p)   # min dist between the two nodes
-#            max_r = rect1.max_distance_rectangle(rect2, strategy, p)   # min dist between the two nodes
-            min_r = float(rect1.min_distance_rectangle_f(rect2, strategy, p))   # min dist between the two nodes in fortran
-            max_r = float(rect1.max_distance_rectangle_f(rect2, strategy, p))   # min dist between the two nodes in fortran
-            
             # Indexes of the radii enterely including the nodes
             # Before there was also other strategies
-            if strategy == 'log_nosqrt_sort':
+            if strategy == 'log_nosqrt_sort' or strategy == 'log_nosqrt_nosort':
 #                print "calcola i raggi che includono i nodi"
                 included = r[rad_idx] > max_r
             else:
@@ -343,16 +334,16 @@ class KDTree(object):
 
             # If self-corr and not yet checked nodes: sum the number of couples in the nodes.
             if (self_corr and (node1.tag < node2.tag)):    
-                result[rad_idx[included]] += node1.children*node2.children   
+                pass
             # If self-corr and identical nodes, add half of the couples.
             elif (self_corr and (node1.tag == node2.tag)):    
-                result[rad_idx[included]] += node1.children*(node2.children-1)/2   
+                pass
             # If self-corr and yet checked, drop. (now redundant)
             elif (self_corr and (node1.tag > node2.tag)):   
                 pass
             # If not sef-corr, add all the couples.        
             else:
-                result[rad_idx[included]] += node1.children*node2.children   
+                pass
 
             if np.all(result>=0) == False:
                 klogger.error("Argh!!! Negative count adding entirely included nodes!!!")
@@ -363,7 +354,11 @@ class KDTree(object):
                 exit()
  
             # Idxs of the radii intersecting the nodes.
+
             if strategy == 'log_nosqrt_sort' or strategy == 'log_nosqrt_nosort':
+#                if min_r == 0:
+#                    rad_idx = rad_idx[(0 <=r[rad_idx]) & (r[rad_idx]<=max_r)]
+#                else:
                 rad_idx = rad_idx[(min_r<=r[rad_idx]) & (r[rad_idx]<=max_r)]
             else:
                 klogger.error("Something wrong checking the intersecting radii!!!")
@@ -378,34 +373,26 @@ class KDTree(object):
                 # and also the second.
                 if isinstance(node2,KDTree.leafnode):
                     ### Open leaves and count couples ###
-#####################################################################################
-#                    Before there was also other strategies                         #
-#####################################################################################
+                    #Before there was also other strategies
                     if strategy == 'log_nosqrt_sort':
                         # Calculate all the possible distances.
                         t = time.time()
-#                        ds = minkowski_distance_p(self.data[node1.idx][:,np.newaxis,:],                 
-#                                                other.data[node2.idx][np.newaxis,:,:],                
-#                                                p).ravel()
-                        ds = minkowski_distance_p_f(self.data[node1.idx], other.data[node2.idx]).ravel()
-                        dist_times += time.time()-t 
-                        t = time.time()
-                        ds.sort()   # sorting all the distances
+                        pass
                         sort_times += time.time()-t
                         leaves +=1 
                         # If is self-corr and not already checked.                                    
                         if (self_corr and (node1.tag <= node2.tag)):                             
                             # Self-corr and identical leaves: half of the result.                     
                             if node1.tag == node2.tag:                        
-                                result[rad_idx] += (np.searchsorted(ds[np.nonzero(ds)],r[rad_idx],side='right'))/2
+                                pass
                           
                             # Self-corr different leaves.                                             
                             else:                                                                     
-                                result[rad_idx] += (np.searchsorted(ds,r[rad_idx],side='right'))
+                                pass
   
                         # If not self-corr.                                                           
                         elif (self_corr != True):                                               
-                            result[rad_idx] += (np.searchsorted(ds,r[rad_idx],side='right'))
+                            pass
 
                         if np.all(result>=0) == False:
                             klogger.error("Argh!!! Negative count opening leaves")
@@ -414,7 +401,7 @@ class KDTree(object):
                             klogger.error("min_r, max_r %s, %s", min_r, max_r)
                             exit()
 
-####################################### end of opened leaves ###########################
+#######################################
 
                 # First node is a leaf but second is not.
                 else:
@@ -487,6 +474,7 @@ class KDTree(object):
             result = np.zeros(1,dtype=long)
             traverse(self.tree, R1, other.tree, R2, np.arange(1))
             t2 = time.time()
+            trav_stats = {}
             trav_stats['Numer of particles'] = self.n
             trav_stats['Total numer of nodes'] = nodetag
             trav_stats['Number of leaves'] = n_leaves
@@ -510,8 +498,8 @@ class KDTree(object):
             array_stats[7] = sort_times
             array_stats[8] = t2-t1
             array_stats[9] = n_traverse/(t2-t1)
-            klogger.info("Done with %s and %s particles and leafsize %s: %s traverse of %s in %s seconds at %s nodes per second.", 
-                         self.n, other.n, self.leafsize, n_traverse, tot_traverse, t2-t1, n_traverse/(t2-t1))
+            klogger.info("Done with %s ans %s particles and leafsize %s: %s traverse of %s in %s seconds at %s nodes per second.", 
+                         self.n, self.leafsize, n_traverse, tot_traverse, t2-t1, n_traverse/(t2-t1))
             return result[0], trav_stats, array_stats
         elif len(np.shape(r))==1:
             t1 = time.time()
@@ -544,7 +532,7 @@ class KDTree(object):
             array_stats[7] = sort_times
             array_stats[8] = t2-t1
             array_stats[9] = n_traverse/(t2-t1)
-            klogger.info("Done with %s and %s particles  and leafsize %s: %s traverse of %s in %s seconds at %s nodes per second.", 
+            klogger.info("Done with %s and %s particles and leafsize %s: %s traverse of %s in %s seconds at %s nodes per second.", 
                          self.n, other.n, self.leafsize, n_traverse, tot_traverse, t2-t1, n_traverse/(t2-t1))
             return result, trav_stats, array_stats
         else:

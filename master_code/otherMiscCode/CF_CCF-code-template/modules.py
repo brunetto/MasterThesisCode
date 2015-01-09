@@ -425,7 +425,7 @@ def dist_test(v, leafsizes=None):
     else:
         chunks = leafsizes
 
-    pos = hdf5_data(None,v.file_2, v.n_sel)
+    pos = hdf5_data(v.file_2, v.n_sel)
     times = np.zeros((len(chunks), 2))
     for i in chunks:
         mlogger.info("Chunk dimension %s", i)
